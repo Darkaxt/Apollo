@@ -78,6 +78,10 @@ namespace proc {
   }
 #endif
 
+  bool should_abort_on_virtual_display_failure(bool headless_mode, bool session_virtual_display, bool app_virtual_display) {
+    return headless_mode || session_virtual_display || app_virtual_display;
+  }
+
   class deinit_t: public platf::deinit_t {
   public:
     ~deinit_t() {
@@ -234,11 +238,16 @@ namespace proc {
     }
 
 #ifdef _WIN32
+    const bool headless_mode = config::video.headless_mode;
+    const bool requested_virtual_display = launch_session->virtual_display;
+    const bool app_virtual_display = _app.virtual_display;
+    const bool must_use_virtual_display = should_abort_on_virtual_display_failure(headless_mode, requested_virtual_display, app_virtual_display);
+
     if (
-      config::video.headless_mode        // Headless mode
-      || launch_session->virtual_display // User requested virtual display
-      || _app.virtual_display            // App is configured to use virtual display
-      || !video::allow_encoder_probing() // No active display presents
+      headless_mode                       // Headless mode
+      || requested_virtual_display        // User requested virtual display
+      || app_virtual_display              // App is configured to use virtual display
+      || !video::allow_encoder_probing()  // No active display presents
     ) {
       if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
         // Try init driver again
@@ -327,9 +336,18 @@ namespace proc {
           config::video.output_name = display_device::map_display_name(this->display_name);
         } else {
           BOOST_LOG(warning) << "Virtual Display creation failed, or cannot get created display name in time!";
+          if (must_use_virtual_display) {
+            BOOST_LOG(error) << "Virtual display was required for this launch; refusing to fall back to a physical display.";
+            return 503;
+          }
         }
       } else {
-        // Driver isn't working so we don't need to track virtual display.
+        if (must_use_virtual_display) {
+          BOOST_LOG(error) << "Virtual display was required for this launch, but the SudoVDA driver is not available.";
+          return 503;
+        }
+
+        // Driver isn't working so we don't need to track opportunistic virtual display probing.
         launch_session->virtual_display = false;
       }
     }

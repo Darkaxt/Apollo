@@ -46,6 +46,8 @@ namespace proc {
   extern VDISPLAY::DRIVER_STATUS vDisplayDriverStatus;
 #endif
 
+  bool should_abort_on_virtual_display_failure(bool headless_mode, bool session_virtual_display, bool app_virtual_display);
+
   typedef config::prep_cmd_t cmd_t;
 
   /**
