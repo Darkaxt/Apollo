@@ -271,48 +271,9 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 }
 
 LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int refresh_rate) {
-	DEVMODEW devMode = {};
-	devMode.dmSize = sizeof(devMode);
-
-	// Old method to set at least baseline refresh rate
-	if (EnumDisplaySettingsW(deviceName, ENUM_CURRENT_SETTINGS, &devMode)) {
-		DWORD targetRefreshRate = refresh_rate / 1000;
-		DWORD altRefreshRate = targetRefreshRate;
-
-		if (refresh_rate % 1000) {
-			if (refresh_rate % 1000 >= 900) {
-				targetRefreshRate += 1;
-			} else {
-				altRefreshRate += 1;
-			}
-		} else {
-			altRefreshRate -= 1;
-		}
-
-		wprintf(L"[SUDOVDA] Applying baseline display mode [%dx%dx%d] for %ls.\n", width, height, targetRefreshRate, deviceName);
-
-		devMode.dmPelsWidth = width;
-		devMode.dmPelsHeight = height;
-		devMode.dmDisplayFrequency = targetRefreshRate;
-		devMode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY;
-
-		auto res = ChangeDisplaySettingsExW(deviceName, &devMode, NULL, CDS_UPDATEREGISTRY, NULL);
-
-		if (res != ERROR_SUCCESS) {
-			wprintf(L"[SUDOVDA] Failed to apply baseline display mode, trying alt mode: [%dx%dx%d].\n", width, height, altRefreshRate);
-			devMode.dmDisplayFrequency = altRefreshRate;
-			res = ChangeDisplaySettingsExW(deviceName, &devMode, NULL, CDS_UPDATEREGISTRY, NULL);
-			if (res != ERROR_SUCCESS) {
-				wprintf(L"[SUDOVDA] Failed to apply alt baseline display mode.\n");
-			}
-		}
-
-		if (res == ERROR_SUCCESS) {
-			wprintf(L"[SUDOVDA] Baseline display mode applied successfully.");
-		}
-	}
-
-	// Use new method to set refresh rate if fine tuned
+	// Use the DisplayConfig path for SudoVDA changes. The legacy ChangeDisplaySettingsExW
+	// path is not virtual-mode aware and can persist a conflicting topology for Windows
+	// to reconcile after the virtual display is already active.
 	return changeDisplaySettings2(deviceName, width, height, refresh_rate);
 }
 
