@@ -22,6 +22,17 @@ namespace VDISPLAY {
 
 HANDLE SUDOVDA_DRIVER_HANDLE = INVALID_HANDLE_VALUE;
 
+UINT32 activeDisplayConfigQueryFlags() {
+	return QDC_ONLY_ACTIVE_PATHS | QDC_VIRTUAL_MODE_AWARE;
+}
+
+UINT32 suppliedDisplayConfigApplyFlags() {
+	return SDC_APPLY
+		| SDC_USE_SUPPLIED_DISPLAY_CONFIG
+		| SDC_SAVE_TO_DATABASE
+		| SDC_VIRTUAL_MODE_AWARE;
+}
+
 // START ISOLATED DISPLAY DECLARATIONS
 struct positionwidthheight;
 struct coordinates;
@@ -64,7 +75,8 @@ LONG getDeviceSettings(const wchar_t* deviceName, DEVMODEW& devMode) {
 LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, int refresh_rate, bool bApplyIsolated) {
 	UINT32 pathCount = 0;
 	UINT32 modeCount = 0;
-	if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount)) {
+	const UINT32 query_flags = activeDisplayConfigQueryFlags();
+	if (GetDisplayConfigBufferSizes(query_flags, &pathCount, &modeCount)) {
 		wprintf(L"[SUDOVDA] Failed to query display configuration size.\n");
 		return ERROR_INVALID_PARAMETER;
 	}
@@ -74,7 +86,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 	std::vector<struct positionwidthheight *> displayArray;
 	struct positionwidthheight *pCurrentElement;
 
-	if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, pathArray.data(), &modeCount, modeArray.data(), nullptr) != ERROR_SUCCESS) {
+	if (QueryDisplayConfig(query_flags, &pathCount, pathArray.data(), &modeCount, modeArray.data(), nullptr) != ERROR_SUCCESS) {
 		wprintf(L"[SUDOVDA] Failed to query display configuration.\n");
 		return ERROR_INVALID_PARAMETER;
 	}
@@ -180,9 +192,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 				pathArray.data(),
 				modeCount,
 				modeArray.data(),
-				SDC_APPLY
-				| SDC_USE_SUPPLIED_DISPLAY_CONFIG
-				| SDC_SAVE_TO_DATABASE
+				suppliedDisplayConfigApplyFlags()
 			);
 			if (status != ERROR_SUCCESS) {
 				wprintf(L"[SUDOVDA] Failed to apply display settings.\n");
@@ -239,9 +249,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 						pathArray.data(),
 						modeCount,
 						modeArray.data(),
-						SDC_APPLY
-						| SDC_USE_SUPPLIED_DISPLAY_CONFIG
-						| SDC_SAVE_TO_DATABASE
+						suppliedDisplayConfigApplyFlags()
 					);
 					if (status != ERROR_SUCCESS) {
 						wprintf(L"[SUDOVDA] Failed to apply display settings.\n");
@@ -386,13 +394,14 @@ bool setPrimaryDisplay(const wchar_t* primaryDeviceName) {
 bool findDisplayIds(const wchar_t* displayName, LUID& adapterId, uint32_t& targetId) {
 	UINT32 pathCount;
 	UINT32 modeCount;
-	if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount)) {
+	const UINT32 query_flags = activeDisplayConfigQueryFlags();
+	if (GetDisplayConfigBufferSizes(query_flags, &pathCount, &modeCount)) {
 		return false;
 	}
 
 	std::vector<DISPLAYCONFIG_PATH_INFO> paths(pathCount);
 	std::vector<DISPLAYCONFIG_MODE_INFO> modes(modeCount);
-	if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, paths.data(), &modeCount, modes.data(), nullptr)) {
+	if (QueryDisplayConfig(query_flags, &pathCount, paths.data(), &modeCount, modes.data(), nullptr)) {
 		return false;
 	}
 

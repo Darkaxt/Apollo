@@ -1,7 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <string>
 #include <vector>
+#include <windows.h>
 
 #ifndef FILE_DEVICE_UNKNOWN
 #define FILE_DEVICE_UNKNOWN 0x00000022
@@ -22,6 +25,8 @@ namespace VDISPLAY {
 
 	extern HANDLE SUDOVDA_DRIVER_HANDLE;
 
+	UINT32 activeDisplayConfigQueryFlags();
+	UINT32 suppliedDisplayConfigApplyFlags();
 	LONG getDeviceSettings(const wchar_t* deviceName, DEVMODEW& devMode);
 	LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int refresh_rate);
 	LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, int refresh_rate, bool bApplyIsolated=false);	
