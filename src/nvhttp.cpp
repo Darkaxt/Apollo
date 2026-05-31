@@ -1267,7 +1267,10 @@ namespace nvhttp {
         }
       }
     } else if (appid > 0 || !appuuid_str.empty()) {
-      if (appid == current_appid || (!appuuid_str.empty() && appuuid_str == current_app_uuid)) {
+      const bool resuming_same_app = appid == current_appid || (!appuuid_str.empty() && appuuid_str == current_app_uuid);
+      const bool restart_for_virtual_display = resuming_same_app && no_active_sessions && launch_session->virtual_display && !proc::proc.virtual_display;
+
+      if (resuming_same_app && !restart_for_virtual_display) {
         // We're basically resuming the same app
 
         BOOST_LOG(debug) << "Resuming app [" << proc::proc.get_last_run_app_name() << "] from launch app path...";
@@ -1292,6 +1295,10 @@ namespace nvhttp {
           }
         }
       } else {
+        if (restart_for_virtual_display) {
+          BOOST_LOG(info) << "Virtual display requested while resuming app [" << proc::proc.get_last_run_app_name() << "]; restarting app path to create virtual display";
+        }
+
         const auto& apps = proc::proc.get_apps();
         auto app_iter = std::find_if(apps.begin(), apps.end(), [&appid_str, &appuuid_str](const auto _app) {
           return _app.id == appid_str || _app.uuid == appuuid_str;
@@ -1398,7 +1405,34 @@ namespace nvhttp {
       launch_session->input_only = true;
     }
 
-    if (no_active_sessions && !proc::proc.virtual_display) {
+    if (no_active_sessions && launch_session->virtual_display && !proc::proc.virtual_display) {
+      const auto& apps = proc::proc.get_apps();
+      const auto current_appid_str = std::to_string(current_appid);
+      auto app_iter = std::find_if(apps.begin(), apps.end(), [&current_appid_str](const auto _app) {
+        return _app.id == current_appid_str;
+      });
+
+      if (app_iter == apps.end()) {
+        BOOST_LOG(error) << "Couldn't find running app with ID ["sv << current_appid_str << "] to recreate virtual display";
+        tree.put("root.resume", 0);
+        tree.put("root.<xmlattr>.status_code", 404);
+        tree.put("root.<xmlattr>.status_message", "Cannot find running application");
+        return;
+      }
+
+      BOOST_LOG(info) << "Virtual display requested while resuming app [" << proc::proc.get_last_run_app_name() << "]; restarting app path to create virtual display";
+      auto err = proc::proc.execute(*app_iter, launch_session);
+      if (err) {
+        tree.put("root.resume", 0);
+        tree.put("root.<xmlattr>.status_code", err);
+        tree.put(
+          "root.<xmlattr>.status_message",
+          err == 503
+          ? "Failed to initialize video capture/encoding. Is a display connected and turned on?"
+          : "Failed to start the running application with a virtual display");
+        return;
+      }
+    } else if (no_active_sessions && !proc::proc.virtual_display) {
       // We want to prepare display only if there are no active sessions
       // and the current session isn't virtual display at the moment.
       // This should be done before probing encoders as it could change the active displays.
