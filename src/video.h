@@ -355,6 +355,17 @@ namespace video {
    */
   bool allow_encoder_probing();
 
+#ifdef SUNSHINE_TESTS
+  void select_display_for_refresh(
+    std::vector<std::string> &display_names,
+    std::vector<std::string> old_display_names,
+    int &current_display_index,
+    const std::string &output_name,
+    const std::string &current_display_name,
+    bool retain_current_display
+  );
+#endif
+
   /**
    * @brief Probe encoders and select the preferred encoder.
    * This is called once at startup and each time a stream is launched to

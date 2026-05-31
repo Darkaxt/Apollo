@@ -1064,6 +1064,56 @@ namespace video {
     }
   }
 
+  void select_display_for_refresh(
+    std::vector<std::string> &display_names,
+    std::vector<std::string> old_display_names,
+    int &current_display_index,
+    const std::string &output_name,
+    const std::string &current_display_name,
+    bool retain_current_display
+  ) {
+    // If we now have no displays, let's put the old display array back and fail
+    if (display_names.empty() && !old_display_names.empty()) {
+      BOOST_LOG(error) << "No displays were found after reenumeration!"sv;
+      display_names = std::move(old_display_names);
+      return;
+    } else if (display_names.empty()) {
+      display_names.emplace_back(output_name);
+    }
+
+    // We now have a new display name list, so reset the index back to 0
+    current_display_index = 0;
+
+    auto target_display_name = current_display_name;
+    if (target_display_name.empty()) {
+      target_display_name = output_name;
+    }
+
+    // If we had a name previously, let's try to find it in the new list
+    if (!target_display_name.empty()) {
+      for (int x = 0; x < display_names.size(); ++x) {
+        if (display_names[x] == target_display_name) {
+          current_display_index = x;
+          return;
+        }
+      }
+
+      if (retain_current_display && !current_display_name.empty()) {
+        BOOST_LOG(warning)
+          << "Preferred display ["sv << current_display_name
+          << "] is not currently present after reenumeration; retaining it instead of falling back to another display"sv;
+        display_names.clear();
+        display_names.emplace_back(current_display_name);
+        return;
+      }
+
+      if (!current_display_name.empty()) {
+        // The old display was removed, so we'll start back at the first display again
+        BOOST_LOG(warning) << "Previous active display ["sv << current_display_name << "] is no longer present"sv;
+      }
+    }
+  }
+
   /**
    * @brief Update the list of display names before or during a stream.
    * @details This will attempt to keep `current_display_index` pointing at the same display.
@@ -1084,42 +1134,7 @@ namespace video {
     // Refresh the display names
     auto old_display_names = std::move(display_names);
     display_names = platf::display_names(dev_type);
-
-    // If we now have no displays, let's put the old display array back and fail
-    if (display_names.empty() && !old_display_names.empty()) {
-      BOOST_LOG(error) << "No displays were found after reenumeration!"sv;
-      display_names = std::move(old_display_names);
-      return;
-    } else if (display_names.empty()) {
-      display_names.emplace_back(output_name);
-    }
-
-    // We now have a new display name list, so reset the index back to 0
-    current_display_index = 0;
-
-    if (current_display_name.empty()) {
-      current_display_name = display_device::map_output_name(config::video.output_name);
-    }
-
-    // If we had a name previously, let's try to find it in the new list
-    if (!current_display_name.empty()) {
-      for (int x = 0; x < display_names.size(); ++x) {
-        if (display_names[x] == current_display_name) {
-          current_display_index = x;
-          return;
-        }
-      }
-
-      // The old display was removed, so we'll start back at the first display again
-      BOOST_LOG(warning) << "Previous active display ["sv << current_display_name << "] is no longer present"sv;
-    } else {
-      for (int x = 0; x < display_names.size(); ++x) {
-        if (display_names[x] == output_name) {
-          current_display_index = x;
-          return;
-        }
-      }
-    }
+    select_display_for_refresh(display_names, std::move(old_display_names), current_display_index, output_name, current_display_name, !preferred_display_name.empty());
   }
 
   void refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index) {

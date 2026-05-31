@@ -48,3 +48,41 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(EncoderTest, ValidateEncoder) {
   // todo:: test something besides fixture setup
 }
+
+TEST(DisplayRefreshTest, RetainsPreferredDisplayWhenItIsMissingAfterReenumeration) {
+  std::vector<std::string> display_names {R"(\\.\DISPLAY5)"};
+  const std::vector<std::string> old_display_names {R"(\\.\DISPLAY63)", R"(\\.\DISPLAY5)"};
+  int current_display_index = 1;
+
+  video::select_display_for_refresh(
+    display_names,
+    old_display_names,
+    current_display_index,
+    R"(\\.\DISPLAY63)",
+    R"(\\.\DISPLAY63)",
+    true
+  );
+
+  ASSERT_EQ(display_names.size(), 1);
+  EXPECT_EQ(display_names[0], R"(\\.\DISPLAY63)");
+  EXPECT_EQ(current_display_index, 0);
+}
+
+TEST(DisplayRefreshTest, FallsBackToFirstDisplayWhenNoPreferredDisplayIsPinned) {
+  std::vector<std::string> display_names {R"(\\.\DISPLAY5)"};
+  const std::vector<std::string> old_display_names {R"(\\.\DISPLAY63)", R"(\\.\DISPLAY5)"};
+  int current_display_index = 1;
+
+  video::select_display_for_refresh(
+    display_names,
+    old_display_names,
+    current_display_index,
+    R"(\\.\DISPLAY63)",
+    R"(\\.\DISPLAY63)",
+    false
+  );
+
+  ASSERT_EQ(display_names.size(), 1);
+  EXPECT_EQ(display_names[0], R"(\\.\DISPLAY5)");
+  EXPECT_EQ(current_display_index, 0);
+}
